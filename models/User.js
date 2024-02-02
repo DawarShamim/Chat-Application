@@ -1,54 +1,60 @@
-const { DataTypes } = require('sequelize');
-const sequelize = require('../config/DBserver');
+const mongoose = require("mongoose");
 const bcrypt = require('bcrypt');
+const Group = require('./Group');
 
-const User = sequelize.define('User', {
-    user_id: {
-        type: DataTypes.BIGINT,
-        primaryKey: true,
-        autoIncrement: true,
-    },
+const userSchema = new mongoose.Schema({
     username: {
-        type: DataTypes.STRING(255),
-        unique: true,
-        allowNull: false,
-    },
-    email: {
-        type: DataTypes.STRING(255),
-        unique: true,
-        allowNull: false,
-        validate: {
-            isEmail: true,
-        },
-    },
-    password: {
-        type: DataTypes.STRING(255),
-        allowNull: false,
-        set(value) {
-            // Hash the password before saving
-            const hashedPassword = bcrypt.hashSync(value, 10);
-            this.setDataValue('password', hashedPassword);
-        },
+        type: String,
+        required: true
     },
     name: {
-        type: DataTypes.STRING(255),
+        type: String,
+        required: true
     },
-    profile_picture: {
-        type: DataTypes.STRING(255), // Assuming you store the URL of the profile picture
-        defaultValue: 'default_profile_picture_url.jpg', // Set a default if needed
+    email: {
+        type: String, required: true, lowercase: true, validate: {
+            validator: function (value) {
+                const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
+                return emailRegex.test(value);
+            },
+            message: props => `${props.value} is not a valid email address!`,
+        },
     },
-    created_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
-    },
-    updated_at: {
-        type: DataTypes.DATE,
-        defaultValue: DataTypes.NOW,
-        onUpdate: DataTypes.NOW,
-    },
+    password: { type: String, required: true },
+    user_groups: [
+        {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Group',
+        }
+    ],
 }, {
     tableName: 'User',
-    timestamps: false,
+    timestamps: true,
 });
+
+userSchema.pre('save', async function (next) {
+    // Only hash the password if it's modified (or new)
+    if (!this.isModified('password')) {
+        return next();
+    }
+
+    const passwordRegex = /^(?=(.*\d){1,})(?=(.*\W){1,})(?!.*\s).{8,20}$/;
+    if (!passwordRegex.test(this.password)) {
+        const error = new Error('Password contain one lowercase letter, one uppercase letter, one numeric character and one special');
+        return next(error);
+    }
+
+    try {
+        const hashedpassword = await bcrypt.hash(this.password, 10);
+
+        this.password = hashedpassword;
+        next();
+    } catch (error) {
+        next(error);
+    }
+});
+
+
+const User = mongoose.model('User', userSchema);
 
 module.exports = User;
