@@ -5,6 +5,7 @@ const passport = require("passport");
 const { validationResult } = require("express-validator");
 const conversationModel = require("../models/UserPrivateConversation");
 const MessageModel = require("../models/Message");
+const Messages = require("../models/Message");
 
 require("dotenv").config();
 const jwtKey = process.env.jwtEncryptionKey;
@@ -53,7 +54,7 @@ exports.register = async (req, res, next) => {
         // Generate JWT token for the new user
         const token = jwt.sign(
             {
-                user_id: newUser.user_id,
+                user_id: newUser._id,
                 username: newUser.username,
                 name: newUser.name,
                 email: newUser.email
@@ -67,24 +68,25 @@ exports.register = async (req, res, next) => {
     }
 };
 
-
 exports.login = async (req, res) => {
     try {
         const username = req.body?.Username;
         const password = req.body?.Password;
-        let user = await UserModel.find({ username: username });
+        let user = await UserModel.findOne({ username: username });
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
+
         const passwordMatch = await bcrypt.compare(password, user.password);
 
         if (!passwordMatch) {
             return res.status(401).json({ success: false, message: 'Invalid password' });
         }
+
         let token = jwt.sign(
             {
-                user_id: user.user_id,
+                user_id: user._id,
                 username: user.username,
                 name: user.name,
                 email: user.email
@@ -94,6 +96,7 @@ exports.login = async (req, res) => {
 
         res.status(200).json({ success: true, message: 'Login successful', token });
     } catch (err) {
+        console.log("err", err);
         res.status(500).json({ success: false, message: 'Failed to login', error: err.message });
     }
 };
@@ -157,6 +160,30 @@ exports.allConversations = async (req, res) => {
         ]);
 
         return res.status(200).json({ success: true, conversations: conversations });
+    } catch (err) {
+        return res.status(500).json({ success: false, message: "Error retrieving conversations" });
+    }
+};
+
+
+exports.allMessages = async (req, res) => {
+    const MAX_MESSAGES_TO_RECALL = 100;
+    const userId = req.user.id;
+    const conversationsId = req.params.conversationId;
+    
+    const page = req.params.page || 1;
+    const skipMessages = (page - 1) * MAX_MESSAGES_TO_RECALL;
+    try {
+        const lastMessages = await Messages.find({
+            conversationId: conversationsId
+        })
+            .sort({ sent_at: -1 })
+            .skip(skipMessages)
+            .limit(PAGE_SIZE);
+
+        const reversedMessages = lastMessages.reverse();
+
+        return res.status(200).json({ success: true, messages: reversedMessages });
     } catch (err) {
         return res.status(500).json({ success: false, message: "Error retrieving conversations" });
     }

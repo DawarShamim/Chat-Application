@@ -11,7 +11,8 @@ module.exports = (passport) => {
     passport.use(
         new Strategy(options, async (payload, done) => {
             try {
-                let user = await UserModel.findOne({ where: { username: payload.user_id } });
+                let user = await UserModel.findById(payload.user_id);
+
                 if (!user) {
                     return done(null, false);
                 }

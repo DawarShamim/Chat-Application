@@ -10,4 +10,6 @@ router.post("/login", UserController.login);
 
 router.get("/allConversations", Authentication, UserController.allConversations);
 
+router.get("/allMessages/:conversationId", Authentication, UserController.allMessages);
+
 module.exports = router;

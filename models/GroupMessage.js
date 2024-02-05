@@ -10,7 +10,7 @@ const groupMessageSchema = new mongoose.Schema({
         ref: 'Group', // Reference for Foreign Key.
         required: true,
     },
-    sent_by: {
+    sender: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', // Reference for Foreign Key.
         required: true,

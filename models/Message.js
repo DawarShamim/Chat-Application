@@ -8,12 +8,12 @@ const messageSchema = new mongoose.Schema({
         ref: 'UserPrivateConversations', // Reference for Foreign Key.
         required: true,
     },
-    sentBy: {
+    sender: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', // Reference for Foreign Key.
         required: true,
     },
-    sentTo: {
+    recipient: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User', // Reference for Foreign Key.
         required: true,

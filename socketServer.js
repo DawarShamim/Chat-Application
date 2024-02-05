@@ -3,34 +3,28 @@ require("dotenv").config();
 const jwt = require("jsonwebtoken");
 const MAX_MESSAGES_TO_RECALL = 100; // Define the maximum number of messages to recall
 
-
-
-
 const User = require('./models/User.js');
 const GroupMessages = require('./models/GroupMessage.js');
 const Groups = require('./models/Group.js');
 const Messages = require('./models/Message.js');
 const UserPrivateConversations = require('./models/UserPrivateConversation.js');
 
-const socketServer = (server) => {
-    const io = require("socket.io")(server, {
-        cors: {
-            origin: "*",
-            methods: ["GET", "POST"],
-        },
-    });
 
-    const connectedClients = {}; // This object will store socketId for each connected client
+module.exports = (socketIO) => {
 
-    io.use(function (socket, next) {
+    const connectedClients = {};
+
+    socketIO.use((socket, next) => {
         // when testing with Postman
         if (socket.handshake.query && socket.handshake.query.token) {
             // if (socket.handshake.auth && socket.handshake.auth.token) {
-            jwt.verify(socket.handshake.query.token, process.env.JwtEncryptionKey, function (err, decoded) {
+            jwt.verify(socket.handshake.query.token, process.env.JwtEncryptionKey, (err, decoded) => {
                 if (err) {
                     return next(new Error('Authentication error'));
                 }
-                socket.decoded = decoded.username;
+                console.log("decoded",decoded.username);
+                socket.username = decoded.username;
+                socket.userId = decoded.userId;
                 next();
             });
         }
@@ -41,75 +35,59 @@ const socketServer = (server) => {
     })
 
         .on('connection', (socket) => {
-            connectedClients[socket.decoded] = socket.id;
+            connectedClients[socket.username] = socket.id;
 
             socket.on('chat', (msg) => {
                 console.log("on chat", msg);
-                io.emit('Message', msg);
+                socketIO.emit('Message', msg);
             });
 
             socket.on('disconnect', () => {
                 console.log(`User disconnected: ${socket.id}`);
-                delete connectedClients[socket.decoded];
+                delete connectedClients[socket.username];
             });
 
-            socket.on('private-message', async (data) => {
-                const targetSocketId = data.targetSocketId;
+            socket.on('send-message', async (data) => {
+                console.log("data", data);
+                console.log("socket.userId", socket.userId);
 
-                if (connectedClients[targetSocketId]) {
+                if (!data.conversationId) {
                     try {
-                        // Save the message to the database
-                        const message = new Messages({
-                            conversationId: data.conversationId,
-                            fromUserId: socket.decoded.userId,
-                            toUserId: data.toUserId, // Assuming you have the toUserId in the data
-                            message: data.message,
+                        const newConversation = new UserPrivateConversations({
+                            user_id_1: data.toUser,
+                            user_id_2: socket.userId,
                         });
-                        await message.save();
-
-                        // Emit the message to the target user
-                        io.to(connectedClients[targetSocketId]).emit('private-message', {
-                            from: socket.decoded,
-                            message: data.message,
-                        });
+                        const savedConversation = await newConversation.save();
+                        data.conversationId = savedConversation._id;
                     } catch (error) {
-                        console.error('Error saving message:', error);
+                        console.error('Error creating conversation:', error);
+                        return; // Exit if an error occurs while creating a conversation
                     }
-                } else {
-                    console.log(`Target socket not found: ${targetSocketId}`);
                 }
-            });
 
-            socket.on('last-messages', async (data) => {
-                console.log("socket.id", socket.id);
-                console.log("data.conversationId", data.conversationId);
-
-                const page = data.page || 1;
-                const skipMessages = (page - 1) * MAX_MESSAGES_TO_RECALL;
                 try {
-                    const lastMessages = await Messages.find({
-                        conversationId: conversationId
-                    })
-                        .sort({ sent_at: -1 })
-                        .skip(skipMessages)
-                        .limit(PAGE_SIZE);
+                    const message = new Messages({
+                        conversationId: data.conversationId,
+                        sender: socket.userId,
+                        recipient: data.toUser,
+                        messageText: data.message,
+                    });
+                    await message.save();
 
-                    // Reverse the order to have the messages in ascending order
-                    const reversedMessages = lastMessages.reverse();
-
-                    // Emit the last 100 messages to the target user if connected
-                    if (connectedClients[data.toUserId]) {
-                        io.to(connectedClients[data.toUserId]).emit('recall-messages', {
-                            messages: reversedMessages,
+                    // Emit the message to the target user
+                    if (connectedClients[data.toUser]) {
+                        socketIO.to(connectedClients[data.toUser]).emit('receive-message', {
+                            from: socket.username,
+                            message: data.message,
                         });
+                    } else {
+                        console.log(`Target socket not found: ${data.toUser}`);
                     }
                 } catch (error) {
-                    console.error('Error fetching or emitting messages:', error);
+                    console.error('Error saving message:', error);
                 }
-            });
-        });
-};
 
-module.exports = {
-    socketServer
+            });
+
+        });
 };
