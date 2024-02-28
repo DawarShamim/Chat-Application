@@ -9,7 +9,6 @@ const Groups = require('./models/Group.js');
 const Messages = require('./models/Message.js');
 const UserPrivateConversations = require('./models/UserPrivateConversation.js');
 
-
 module.exports = (socketIO) => {
 
     const connectedClients = {};
@@ -22,9 +21,8 @@ module.exports = (socketIO) => {
                 if (err) {
                     return next(new Error('Authentication error'));
                 }
-                console.log("decoded",decoded.username);
                 socket.username = decoded.username;
-                socket.userId = decoded.userId;
+                socket.userId = decoded.user_id;
                 next();
             });
         }
@@ -35,7 +33,7 @@ module.exports = (socketIO) => {
     })
 
         .on('connection', (socket) => {
-            connectedClients[socket.username] = socket.id;
+            connectedClients[socket.userId] = socket.id;
 
             socket.on('chat', (msg) => {
                 console.log("on chat", msg);
@@ -44,13 +42,10 @@ module.exports = (socketIO) => {
 
             socket.on('disconnect', () => {
                 console.log(`User disconnected: ${socket.id}`);
-                delete connectedClients[socket.username];
+                delete connectedClients[socket.userId];
             });
 
             socket.on('send-message', async (data) => {
-                console.log("data", data);
-                console.log("socket.userId", socket.userId);
-
                 if (!data.conversationId) {
                     try {
                         const newConversation = new UserPrivateConversations({
@@ -61,7 +56,7 @@ module.exports = (socketIO) => {
                         data.conversationId = savedConversation._id;
                     } catch (error) {
                         console.error('Error creating conversation:', error);
-                        return; // Exit if an error occurs while creating a conversation
+                        return;
                     }
                 }
 
@@ -77,7 +72,7 @@ module.exports = (socketIO) => {
                     // Emit the message to the target user
                     if (connectedClients[data.toUser]) {
                         socketIO.to(connectedClients[data.toUser]).emit('receive-message', {
-                            from: socket.username,
+                            from: socket.userId,
                             message: data.message,
                         });
                     } else {
@@ -86,8 +81,6 @@ module.exports = (socketIO) => {
                 } catch (error) {
                     console.error('Error saving message:', error);
                 }
-
             });
-
         });
 };

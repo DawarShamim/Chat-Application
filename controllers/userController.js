@@ -70,12 +70,12 @@ exports.register = async (req, res, next) => {
 
 exports.login = async (req, res) => {
     try {
-        const username = req.body?.Username;
+        const email = req.body?.Email;
         const password = req.body?.Password;
-        let user = await UserModel.findOne({ username: username });
+        let user = await UserModel.findOne({ email: email });
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found' });
+            return res.status(404).json({ success: false, message: 'Email not found' });
         }
 
         const passwordMatch = await bcrypt.compare(password, user.password);
@@ -103,6 +103,7 @@ exports.login = async (req, res) => {
 
 exports.allConversations = async (req, res) => {
     const userId = req.user.id;
+    console.log("userId",userId);
     try {
         const conversations = await conversationModel.aggregate([
             {
@@ -112,51 +113,51 @@ exports.allConversations = async (req, res) => {
                         { user_id_2: userId }
                     ]
                 }
-            },
-            {
-                $lookup: {
-                    from: 'MessageModel', // Assuming the name of the Messages collection
-                    let: { conversationId: '$_id' },
-                    pipeline: [
-                        {
-                            $match: {
-                                $expr: {
-                                    $or: [
-                                        { $eq: ['$fromUserId', userId] },
-                                        { $eq: ['$toUserId', userId] }
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            $sort: { sent_at: -1 } // Sort by sent_at in descending order
-                        },
-                        {
-                            $limit: 1 // Take only the latest message
-                        }
-                    ],
-                    as: 'latestMessage'
-                }
-            },
-            {
-                $addFields: {
-                    latestMessage: { $arrayElemAt: ['$latestMessage', 0] }
-                }
-            },
-            {
-                $project: {
-                    user_id_1: 1,
-                    user_id_2: 1,
-                    created_at: 1,
-                    latestMessage: {
-                        _id: 1,
-                        fromUserId: 1,
-                        toUserId: 1,
-                        message: 1,
-                        sent_at: 1
-                    }
-                }
             }
+            // {
+            //     $lookup: {
+            //         from: 'MessageModel', // Assuming the name of the Messages collection
+            //         let: { conversationId: '$_id' },
+            //         pipeline: [
+            //             {
+            //                 $match: {
+            //                     $expr: {
+            //                         $or: [
+            //                             { $eq: ['$fromUserId', userId] },
+            //                             { $eq: ['$toUserId', userId] }
+            //                         ]
+            //                     }
+            //                 }
+            //             },
+            //             {
+            //                 $sort: { sent_at: -1 } // Sort by sent_at in descending order
+            //             },
+            //             {
+            //                 $limit: 1 // Take only the latest message
+            //             }
+            //         ],
+            //         as: 'latestMessage'
+            //     }
+            // },
+            // {
+            //     $addFields: {
+            //         latestMessage: { $arrayElemAt: ['$latestMessage', 0] }
+            //     }
+            // },
+            // {
+            //     $project: {
+            //         user_id_1: 1,
+            //         user_id_2: 1,
+            //         created_at: 1,
+            //         latestMessage: {
+            //             _id: 1,
+            //             fromUserId: 1,
+            //             toUserId: 1,
+            //             message: 1,
+            //             sent_at: 1
+            //         }
+            //     }
+            // }
         ]);
 
         return res.status(200).json({ success: true, conversations: conversations });
@@ -170,7 +171,7 @@ exports.allMessages = async (req, res) => {
     const MAX_MESSAGES_TO_RECALL = 100;
     const userId = req.user.id;
     const conversationsId = req.params.conversationId;
-    
+
     const page = req.params.page || 1;
     const skipMessages = (page - 1) * MAX_MESSAGES_TO_RECALL;
     try {
@@ -179,8 +180,7 @@ exports.allMessages = async (req, res) => {
         })
             .sort({ sent_at: -1 })
             .skip(skipMessages)
-            .limit(PAGE_SIZE);
-
+            .limit(MAX_MESSAGES_TO_RECALL);
         const reversedMessages = lastMessages.reverse();
 
         return res.status(200).json({ success: true, messages: reversedMessages });

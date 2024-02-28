@@ -59,7 +59,6 @@ socketServer(socketIO);
 startApp = async () => {
     try {
         mongoose.set("strictQuery", false);
-        console.log({ connectionURL: `${DBurl}` });
         await mongoose.connect(DBurl);
         console.log("Connected to the Database successfully");
         http.listen(PORT, () => {
