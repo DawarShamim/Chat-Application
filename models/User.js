@@ -23,6 +23,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     connections: [{ type: mongoose.Types.ObjectId, ref: 'User' }],
     user_groups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Group' }],
+    profileimgurl:{type:String ,default: "/public/default_profile_pic.jpg"}
 }, {
     tableName: 'User',
     timestamps: true,
