@@ -21,12 +21,8 @@ const userSchema = new mongoose.Schema({
         },
     },
     password: { type: String, required: true },
-    user_groups: [
-        {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'Group',
-        }
-    ],
+    connections: [{ type: mongoose.Types.ObjectId, ref: 'User' }],
+    user_groups: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Group' }],
 }, {
     tableName: 'User',
     timestamps: true,

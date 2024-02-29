@@ -82,5 +82,25 @@ module.exports = (socketIO) => {
                     console.error('Error saving message:', error);
                 }
             });
+
+            socket.on('emit-typing', async (data) => {
+                if (!data.conversationId) {
+                    return;
+                }
+                try {
+                    // Emit the message to the target user
+                    if (connectedClients[data.toUser]) {
+                        socketIO.to(connectedClients[data.toUser]).emit('listen-typing', {
+                            conversationId: data.conversationId,
+                            from: socket.userId,
+                            typing: true
+                        });
+                    } else {
+                        console.log(`Target socket not found: ${data.toUser}`);
+                    }
+                } catch (error) {
+                    console.error('Error saving message:', error);
+                }
+            });
         });
 };

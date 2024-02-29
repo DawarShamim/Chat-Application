@@ -12,4 +12,5 @@ router.get("/allConversations", Authentication, UserController.allConversations)
 
 router.get("/allMessages/:conversationId", Authentication, UserController.allMessages);
 
+router.get("/SearchConnections", Authentication, UserController.searchUser);
 module.exports = router;

@@ -6,6 +6,8 @@ const { validationResult } = require("express-validator");
 const conversationModel = require("../models/UserPrivateConversation");
 const MessageModel = require("../models/Message");
 const Messages = require("../models/Message");
+const User = require("../models/User");
+const mongoose = require('mongoose');
 
 require("dotenv").config();
 const jwtKey = process.env.jwtEncryptionKey;
@@ -103,69 +105,49 @@ exports.login = async (req, res) => {
 
 exports.allConversations = async (req, res) => {
     const userId = req.user.id;
-    console.log("userId",userId);
     try {
         const conversations = await conversationModel.aggregate([
             {
                 $match: {
                     $or: [
-                        { user_id_1: userId },
-                        { user_id_2: userId }
+                        { user_id_1: new mongoose.Types.ObjectId(userId) },
+                        { user_id_2: new mongoose.Types.ObjectId(userId) }
                     ]
                 }
-            }
-            // {
-            //     $lookup: {
-            //         from: 'MessageModel', // Assuming the name of the Messages collection
-            //         let: { conversationId: '$_id' },
-            //         pipeline: [
-            //             {
-            //                 $match: {
-            //                     $expr: {
-            //                         $or: [
-            //                             { $eq: ['$fromUserId', userId] },
-            //                             { $eq: ['$toUserId', userId] }
-            //                         ]
-            //                     }
-            //                 }
-            //             },
-            //             {
-            //                 $sort: { sent_at: -1 } // Sort by sent_at in descending order
-            //             },
-            //             {
-            //                 $limit: 1 // Take only the latest message
-            //             }
-            //         ],
-            //         as: 'latestMessage'
-            //     }
-            // },
-            // {
-            //     $addFields: {
-            //         latestMessage: { $arrayElemAt: ['$latestMessage', 0] }
-            //     }
-            // },
-            // {
-            //     $project: {
-            //         user_id_1: 1,
-            //         user_id_2: 1,
-            //         created_at: 1,
-            //         latestMessage: {
-            //             _id: 1,
-            //             fromUserId: 1,
-            //             toUserId: 1,
-            //             message: 1,
-            //             sent_at: 1
-            //         }
-            //     }
-            // }
+            }, {
+                $lookup: {
+                    from: "messages",
+                    localField: "_id",
+                    foreignField: "conversationId",
+                    as: "messages"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "user_id_1",
+                    foreignField: "_id",
+                    as: "user_id_1"
+                }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "user_id_2",
+                    foreignField: "_id",
+                    as: "user_id_2"
+                }
+            },
+
+
+
         ]);
 
         return res.status(200).json({ success: true, conversations: conversations });
     } catch (err) {
-        return res.status(500).json({ success: false, message: "Error retrieving conversations" });
+        return res.status(500).json({ success: false, message: "Error retrieving conversations", error: err });
     }
 };
-
 
 exports.allMessages = async (req, res) => {
     const MAX_MESSAGES_TO_RECALL = 100;
@@ -185,6 +167,51 @@ exports.allMessages = async (req, res) => {
 
         return res.status(200).json({ success: true, messages: reversedMessages });
     } catch (err) {
-        return res.status(500).json({ success: false, message: "Error retrieving conversations" });
+        return res.status(500).json({ success: false, message: "Error retrieving conversations", error: err });
+    }
+};
+
+exports.searchUser = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const UserKeyword = req.query?.q;
+
+
+        const user = await UserModel.aggregate([
+
+            {
+                $match: { _id: new mongoose.Types.ObjectId(userId) } // Convert userId to ObjectId and match the user by _id
+            },
+            {
+                $addFields: {
+                    connections: { $map: { input: "$connections", as: "conn", in: { $toObjectId: "$$conn" } } } // Convert each connection to ObjectId
+                }
+            },
+            {
+                $unwind: "$connections" // Deconstruct the connections array to prepare for the lookup
+            },
+            {
+                $lookup: {
+                    from: "users", // Collection name where user data is stored
+                    localField: "connections", // Field in the current collection (UserModel) to perform the lookup
+                    foreignField: "_id", // Field in the foreign collection (users) to match against
+                    as: "connectionUserData" // Output array field where the connected user data will be stored
+                }
+            }, {
+                $unwind: "$connectionUserData",
+            },
+            {
+                $project: {
+                    "connectionUserData._id": 1,
+                    "connectionUserData.username": 1,
+                    "connectionUserData.email": 1,
+                },
+            },
+        ]);
+
+        return res.status(200).json({ success: true, friends: user, UserKeyword });
+    } catch (err) {
+        console.log(err);
+        return res.status(500).json({ success: false, message: "Error retrieving messages" });
     }
 };
