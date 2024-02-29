@@ -114,7 +114,8 @@ exports.allConversations = async (req, res) => {
                         { user_id_2: new mongoose.Types.ObjectId(userId) }
                     ]
                 }
-            }, {
+            },
+            {
                 $lookup: {
                     from: "messages",
                     localField: "_id",
@@ -138,11 +139,26 @@ exports.allConversations = async (req, res) => {
                     as: "user_id_2"
                 }
             },
-
-
-
+            {
+                $project: {
+                    "_id": 1,
+                    "user_id_1._id": 1,
+                    "user_id_1.name": 1,
+                    "user_id_2._id": 1,
+                    "user_id_2.name": 1,
+                    "messages": {
+                        $filter: {
+                            input: "$messages",
+                            as: "message",
+                            cond: {
+                                $ne: ["$$message", new mongoose.Types.ObjectId(userId)]
+                            }
+                        }
+                    }
+                }
+            }
         ]);
-
+        
         return res.status(200).json({ success: true, conversations: conversations });
     } catch (err) {
         return res.status(500).json({ success: false, message: "Error retrieving conversations", error: err });
