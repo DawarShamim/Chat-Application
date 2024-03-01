@@ -165,10 +165,24 @@ exports.allConversations = async (req, res) => {
                     }
                 }
             },
+            {
+                $project: {
+                    _id: 1,
+                    "lastMessage._id": 1,
+                    "lastMessage.sender": 1,
+                    "lastMessage.recipient": 1,
+                    "lastMessage.sentAt": 1,
+                    "lastMessage.body": 1,
+                    "chat.username": "$otherUserId.username",
+                    "chat.name": "$otherUserId.name",
+                    "chat.email": "$otherUserId.email",
+                    "chat.profileimgurl": "$otherUserId.profileimgurl",
+                    "chat.statusOnline": "$otherUserId.statusOnline",
+                }
+            }
         ]);
         return res.status(200).json({ success: true, conversations: conversations, myID: userId });
     } catch (err) {
-        console.log('Data on line 168 :', err);
         return res.status(500).json({ success: false, message: "Error retrieving conversations", error: err });
     }
 };
