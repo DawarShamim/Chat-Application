@@ -201,9 +201,9 @@ exports.allMessages = async (req, res) => {
             .sort({ sent_at: -1 })
             .skip(skipMessages)
             .limit(MAX_MESSAGES_TO_RECALL);
-        const reversedMessages = lastMessages.reverse();
+        // const reversedMessages = lastMessages.reverse();
 
-        return res.status(200).json({ success: true, messages: reversedMessages });
+        return res.status(200).json({ success: true, messages: lastMessages });
     } catch (err) {
         return res.status(500).json({ success: false, message: "Error retrieving conversations", error: err });
     }
@@ -213,21 +213,15 @@ exports.searchUser = async (req, res) => {
     try {
         const userId = req.user.id;
         const UserKeyword = req.query?.q;
-
-
         const user = await UserModel.aggregate([
 
-            {
-                $match: { _id: new mongoose.Types.ObjectId(userId) } // Convert userId to ObjectId and match the user by _id
-            },
+            { $match: { _id: new mongoose.Types.ObjectId(userId) } },
             {
                 $addFields: {
-                    connections: { $map: { input: "$connections", as: "conn", in: { $toObjectId: "$$conn" } } } // Convert each connection to ObjectId
+                    connections: { $map: { input: "$connections", as: "conn", in: { $toObjectId: "$$conn" } } }
                 }
             },
-            {
-                $unwind: "$connections" // Deconstruct the connections array to prepare for the lookup
-            },
+            { $unwind: "$connections" },
             {
                 $lookup: {
                     from: "users", // Collection name where user data is stored
@@ -235,9 +229,8 @@ exports.searchUser = async (req, res) => {
                     foreignField: "_id", // Field in the foreign collection (users) to match against
                     as: "connectionUserData" // Output array field where the connected user data will be stored
                 }
-            }, {
-                $unwind: "$connectionUserData",
             },
+            { $unwind: "$connectionUserData" },
             {
                 $project: {
                     "connectionUserData._id": 1,

@@ -34,7 +34,7 @@ const { isHttpError } = require("http-errors");
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// app.use('/public/', express.static(path.join(__dirname, 'public')));
+app.use('/public/', express.static(path.join(__dirname, 'public')));
 // app.use('/public-api', require("./routes/PublicRoute"));
 
 app.use("/user", require("./routes/userRoute"));
