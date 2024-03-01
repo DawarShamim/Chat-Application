@@ -105,11 +105,8 @@ exports.login = async (req, res) => {
 
 exports.allConversations = async (req, res) => {
     const userId = req.user.id;
-    // const userId = "65e17d2b8bc188263e5e46fa";
 
     try {
-
-
         const conversations = await conversationModel.aggregate([
             {
                 $match: {
@@ -118,69 +115,58 @@ exports.allConversations = async (req, res) => {
                         { user_id_2: new mongoose.Types.ObjectId(userId), },
                     ],
                 },
-            }, {
+            },
+            {
                 $lookup: {
                     from: "messages",
                     localField: "_id",
                     foreignField: "conversationId",
                     as: "messages",
                 },
-            }
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "user_id_1",
+                    foreignField: "_id",
+                    as: "user_id_1",
+                },
+            },
+            {
+                $lookup: {
+                    from: "users",
+                    localField: "user_id_2",
+                    foreignField: "_id",
+                    as: "user_id_2",
+                },
+            },
+            { $unwind: "$user_id_2" },
+            { $unwind: "$user_id_1" },
+            { $unwind: "$messages" },
+            { $sort: { "messages.sentAt": -1 } }, // Sort the messages by the sentAt field in descending order
+            {
+                $group: {
+                    _id: "$_id",
+                    user_id_1: { $first: "$user_id_1" },
+                    user_id_2: { $first: "$user_id_2" },
+                    messages: { $first: "$messages" }
+                }
+            },
+            {
+                $project: {
+                    _id: 1,
+                    lastMessage: "$messages",
+                    otherUserId: {
+                        $cond: {
+                            if: { $eq: ["$user_id_1._id", new mongoose.Types.ObjectId(userId)] },
+                            then: "$user_id_2",
+                            else: "$user_id_1"
+                        }
+                    }
+                }
+            },
         ]);
-
-        // aggregation pipeline 
-        // const conversations = await conversationModel.aggregate([
-        //     {
-        //         $match: {
-        //             $or: [
-        //                 { user_id_1: new mongoose.Types.ObjectId(userId), },
-        //                 { user_id_2: new mongoose.Types.ObjectId(userId), },
-        //             ],
-        //         },
-        //     },
-        //     {
-        //         $lookup: {
-        //             from: "messages",
-        //             localField: "_id",
-        //             foreignField: "conversationId",
-        //             as: "messages",
-        //         },
-        //     },
-        //     {
-        //         $lookup: {
-        //             from: "users",
-        //             localField: "user_id_1",
-        //             foreignField: "_id",
-        //             as: "user_id_1",
-        //         },
-        //     },
-        //     {
-        //         $lookup: {
-        //             from: "users",
-        //             localField: "user_id_2",
-        //             foreignField: "_id",
-        //             as: "user_id_2",
-        //         },
-        //     },
-        //     {
-        //         $project: {
-        //             _id: 1,
-        //             "user_id_1._id": 1,
-        //             "user_id_1.name": 1,
-        //             "user_id_2._id": 1,
-        //             "user_id_2.name": 1,
-        //             messages: "$messages",
-        //         },
-        //     },
-        //     { $unwind: "$messages", },
-        //     { $sort: { "messages.sentAt": -1, }, },
-        //     {
-        //         $limit: 1, // Limit to the latest message
-        //     },
-        // ]
-        // );
-
-        return res.status(200).json({ success: true, conversations: conversations });
+        return res.status(200).json({ success: true, conversations: conversations, myID: userId });
     } catch (err) {
         console.log('Data on line 168 :', err);
         return res.status(500).json({ success: false, message: "Error retrieving conversations", error: err });
