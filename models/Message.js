@@ -18,7 +18,7 @@ const messageSchema = new mongoose.Schema({
         ref: 'User', // Reference for Foreign Key.
         required: true,
     },
-    messageText: {
+    body: {
         type: String,
     },
     sentAt: {

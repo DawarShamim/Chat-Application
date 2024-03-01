@@ -32,16 +32,20 @@ module.exports = (socketIO) => {
         }
     })
 
-        .on('connection', (socket) => {
+        .on('connection', async(socket) => {
             connectedClients[socket.userId] = socket.id;
+            console.log("user connected", socket.userId);
+            await User.findByIdAndUpdate(socket.userId,{statusOnline:true});
 
             socket.on('chat', (msg) => {
                 console.log("on chat", msg);
                 socketIO.emit('Message', msg);
             });
 
-            socket.on('disconnect', () => {
+            socket.on('disconnect', async() => {
                 console.log(`User disconnected: ${socket.id}`);
+                await User.findByIdAndUpdate(socket.userId,{statusOnline:false});
+
                 delete connectedClients[socket.userId];
             });
 
@@ -65,15 +69,18 @@ module.exports = (socketIO) => {
                         conversationId: data.conversationId,
                         sender: socket.userId,
                         recipient: data.toUser,
-                        messageText: data.message,
+                        body: data.body,
                     });
                     await message.save();
+
+                    
 
                     // Emit the message to the target user
                     if (connectedClients[data.toUser]) {
                         socketIO.to(connectedClients[data.toUser]).emit('receive-message', {
+                            conversationId: data.conversationId,
                             from: socket.userId,
-                            message: data.message,
+                            body: data.body,
                         });
                     } else {
                         console.log(`Target socket not found: ${data.toUser}`);
