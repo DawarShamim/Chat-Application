@@ -3,23 +3,21 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const logger = require("morgan");
 
-
-
 const express = require("express");
 const app = express();
-//New imports
-const http = require('http').Server(app);
-//Pass the Express app into the HTTP module.
-const socketIO = require('socket.io')(http);
 
+const http = require('http').Server(app);
+app.use(cors()); 
+const socketIO = require('socket.io')(http, {
+    cors: {
+      origin: '*',
+    }
+  });
 const socketServer = require("./socketServer");
 
 app.use(logger("dev"));
 require("dotenv").config();
 
-
-
-app.use(cors()); // Add cors middleware
 require("./middleware/passport")(passport);
 
 

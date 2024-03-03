@@ -15,9 +15,9 @@ module.exports = (socketIO) => {
 
     socketIO.use((socket, next) => {
         // when testing with Postman
-        if (socket.handshake.query && socket.handshake.query.token) {
-            // if (socket.handshake.auth && socket.handshake.auth.token) {
-            jwt.verify(socket.handshake.query.token, process.env.JwtEncryptionKey, (err, decoded) => {
+        // if (socket.handshake.query && socket.handshake.query.token) {
+            if (socket.handshake.auth && socket.handshake.auth.token) {
+            jwt.verify(socket.handshake.auth.token, process.env.JwtEncryptionKey, (err, decoded) => {
                 if (err) {
                     return next(new Error('Authentication error'));
                 }
@@ -73,10 +73,10 @@ module.exports = (socketIO) => {
                     });
                     await message.save();
 
-                    
+                    const sendTo = await User.findById(data.toUser);
+                    console.log("sendTo",sendTo);
 
-                    // Emit the message to the target user
-                    if (connectedClients[data.toUser]) {
+                    if (sendTo && sendTo?.socket_id) {
                         socketIO.to(connectedClients[data.toUser]).emit('receive-message', {
                             conversationId: data.conversationId,
                             from: socket.userId,
